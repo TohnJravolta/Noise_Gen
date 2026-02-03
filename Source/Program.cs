@@ -105,7 +105,7 @@ namespace NoiseGen
             _engine.Generators.Add(new BinauralGenerator("Relax (7Hz Alpha)", 200, 7) { Enabled = _config.GetBool("gen4_enabled", false), Volume = _config.GetFloat("gen4_vol", 0.5f) });
             _engine.Generators.Add(new BinauralGenerator("Sleep (4Hz Theta)", 150, 4) { Enabled = _config.GetBool("gen5_enabled", false), Volume = _config.GetFloat("gen5_vol", 0.5f) });
 
-            _engine.MasterVolume = _config.GetFloat("master_vol", 1.0f);
+            _engine.MasterVolume = _config.GetFloat("master_vol", 0.69f);
             
             // Load Color Blind Mode preference
             _colorBlindMode = _config.GetBool("color_blind_mode", false);
@@ -128,16 +128,13 @@ namespace NoiseGen
                  string name = Path.GetFileNameWithoutExtension(f);
                  if (name != "last_session") _profileList.Add(name);
              }
-             if (_profileList.Count == 0) _profileList.Add("profiles");
+             if (_profileList.Count == 0) _profileList.Add("DEFAULT");
         }
 
         static int _selectedIndex = 0;
         
         
-        const int VK_LEFT = 0x25;
-        const int VK_UP = 0x26;
-        const int VK_RIGHT = 0x27;
-        const int VK_DOWN = 0x28;
+        
         
         [DllImport("kernel32.dll")]
         static extern bool SetConsoleCtrlHandler(HandlerRoutine Handler, bool Add);
@@ -160,7 +157,8 @@ namespace NoiseGen
             // Process keys
             while (Console.KeyAvailable)
             {
-                var key = Console.ReadKey(true).Key;
+                var keyInfo = Console.ReadKey(true);
+                var key = keyInfo.Key;
                 
                 if (key == ConsoleKey.Escape) _running = false;
                 
@@ -205,6 +203,14 @@ namespace NoiseGen
                     _colorBlindMode = !_colorBlindMode;
                 }
 
+                if (key == ConsoleKey.Tab)
+                {
+                     if ((keyInfo.Modifiers & ConsoleModifiers.Shift) != 0)
+                        _selectedIndex = Math.Max(_selectedIndex - 1, 0);
+                     else
+                        _selectedIndex = Math.Min(_selectedIndex + 1, _engine.Generators.Count);
+                }
+
                 if (key == ConsoleKey.DownArrow) _selectedIndex = Math.Min(_selectedIndex + 1, _engine.Generators.Count);
                 if (key == ConsoleKey.UpArrow) _selectedIndex = Math.Max(_selectedIndex - 1, 0);
                 
@@ -213,6 +219,20 @@ namespace NoiseGen
                 {
                     if (_selectedIndex < _engine.Generators.Count)
                         _engine.Generators[_selectedIndex].Enabled = !_engine.Generators[_selectedIndex].Enabled;
+                    else
+                        _engine.MasterEnabled = !_engine.MasterEnabled;
+                }
+
+                // Kill/Mute
+                if (key == ConsoleKey.M)
+                {
+                    _engine.MasterEnabled = !_engine.MasterEnabled;
+                }
+
+                // Reset Defaults
+                if (key == ConsoleKey.R)
+                {
+                    ResetToDefaults();
                 }
             }
         }
@@ -462,7 +482,7 @@ namespace NoiseGen
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine("-----------------------------".PadRight(79));
             Console.ResetColor();
-            DrawItem(_engine.Generators.Count, "MASTER VOLUME", true, _engine.MasterVolume);
+            DrawItem(_engine.Generators.Count, "MASTER VOLUME", _engine.MasterEnabled, _engine.MasterVolume);
             
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine("-----------------------------".PadRight(79));
@@ -476,12 +496,26 @@ namespace NoiseGen
             
             // Highlight Color Blind Toggle
             if (_colorBlindMode) Console.ForegroundColor = ConsoleColor.Yellow; 
-            else Console.ForegroundColor = ConsoleColor.Magenta; // Magenta stands out in regular mode
+            else Console.ForegroundColor = ConsoleColor.Magenta;
             
-            Console.Write("[C] Color Blind Mode");
+            Console.WriteLine("[C] Color Blind Mode".PadRight(40));
+            
+            // Row 3: Mute, Reset, Quit
+            // Mute Logic
+            if (!_engine.MasterEnabled)
+            {
+                if (_colorBlindMode) Console.ForegroundColor = ConsoleColor.White; // High contrast
+                else Console.ForegroundColor = ConsoleColor.Red;
+                Console.Write("[M] UNMUTE ");
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.Write("[M] Mute   ");
+            }
             
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine(" | [ESC] Quit".PadRight(40)); // Pad enough to complete the line
+            Console.WriteLine(" | [R] Reset | [ESC] Quit".PadRight(40));
             
             Console.ResetColor();
             
@@ -599,6 +633,20 @@ namespace NoiseGen
                     break;
             }
             return true;
+        }
+
+        static void ResetToDefaults()
+        {
+             // Disable all gens, reset volumes
+             foreach(var gen in _engine.Generators)
+             {
+                 gen.Enabled = false;
+                 gen.Volume = 0.5f;
+             }
+             _engine.MasterVolume = 0.69f;
+             _engine.MasterEnabled = true;
+             _colorBlindMode = false;
+             _currentProfileName = "DEFAULT";
         }
     }
 }
