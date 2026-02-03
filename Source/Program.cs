@@ -9,7 +9,7 @@ namespace NoiseGen
 {
     class Program
     {
-        enum AppState { Mixing, ProfileMenu, NamingProfile }
+        enum AppState { Mixing, ProfileMenu, NamingProfile, DeleteConfirm }
 
         static AudioEngine _engine;
         static ConfigManager _config;
@@ -22,6 +22,7 @@ namespace NoiseGen
         static int _profileIndex = 0;
         static string _inputName = "";
         static string _currentProfileName = "Default";
+        static bool _colorBlindMode = false;
 
         static void Main(string[] args)
         {
@@ -47,6 +48,7 @@ namespace NoiseGen
                     if (_state == AppState.Mixing) InputMixing();
                     else if (_state == AppState.ProfileMenu) InputProfileMenu();
                     else if (_state == AppState.NamingProfile) InputNaming();
+                    else if (_state == AppState.DeleteConfirm) InputDeleteConfirm();
 
                     Update();
                     
@@ -98,6 +100,9 @@ namespace NoiseGen
             _engine.Generators.Add(new BinauralGenerator("Sleep (4Hz Theta)", 150, 4) { Enabled = _config.GetBool("gen5_enabled", false), Volume = _config.GetFloat("gen5_vol", 0.5f) });
 
             _engine.MasterVolume = _config.GetFloat("master_vol", 1.0f);
+            
+            // Load Color Blind Mode preference
+            _colorBlindMode = _config.GetBool("color_blind_mode", false);
 
             // Perf
             try {
@@ -133,15 +138,17 @@ namespace NoiseGen
         
         static void InputMixing()
         {
-            // Clear the keyboard buffer first to prevent ghost inputs
-            while (Console.KeyAvailable) Console.ReadKey(true);
-            
-            // Check for actual key presses using Console for non-volume controls
-            if (Console.KeyAvailable)
+            // Process ALL keys in the buffer
+            // We ignore Left/Right here because we handle them via GetAsyncKeyState below
+            // This effectively drains "ghost" repeats of volume keys, while catching discrete presses of others
+            while (Console.KeyAvailable)
             {
                 var key = Console.ReadKey(true).Key;
                 
                 if (key == ConsoleKey.Escape) _running = false;
+                
+                if (key == ConsoleKey.LeftArrow || key == ConsoleKey.RightArrow) continue; // Ignore buffered volume
+
                 if (key == ConsoleKey.P) 
                 {
                     _state = AppState.ProfileMenu;
@@ -154,6 +161,12 @@ namespace NoiseGen
                     _state = AppState.NamingProfile;
                     _inputName = "";
                     return;
+                }
+                
+                // Color Blind Toggle
+                if (key == ConsoleKey.C)
+                {
+                    _colorBlindMode = !_colorBlindMode;
                 }
 
                 if (key == ConsoleKey.DownArrow) _selectedIndex = Math.Min(_selectedIndex + 1, _engine.Generators.Count);
@@ -202,10 +215,42 @@ namespace NoiseGen
                 if (key == ConsoleKey.DownArrow) _profileIndex = Math.Min(_profileIndex + 1, _profileList.Count - 1);
                 if (key == ConsoleKey.UpArrow) _profileIndex = Math.Max(_profileIndex - 1, 0);
 
+                if (key == ConsoleKey.Delete)
+                {
+                    if (_profileList.Count > 0)
+                    {
+                        _state = AppState.DeleteConfirm;
+                    }
+                    return;
+                }
+
                 if (key == ConsoleKey.Enter)
                 {
                    LoadProfile(_profileList[_profileIndex]);
                    _state = AppState.Mixing;
+                }
+            }
+        }
+
+        static void InputDeleteConfirm()
+        {
+            if (Console.KeyAvailable)
+            {
+                var key = Console.ReadKey(true).Key;
+                if (key == ConsoleKey.Y)
+                {
+                    string target = _profileList[_profileIndex] + ".ini";
+                    if (File.Exists(target))
+                    {
+                        try { File.Delete(target); } catch {}
+                        RefreshProfileList();
+                        _profileIndex = Math.Min(_profileIndex, Math.Max(0, _profileList.Count - 1));
+                    }
+                    _state = AppState.ProfileMenu;
+                }
+                else if (key == ConsoleKey.N || key == ConsoleKey.Escape)
+                {
+                    _state = AppState.ProfileMenu;
                 }
             }
         }
@@ -268,6 +313,7 @@ namespace NoiseGen
                 cfg.Set(string.Format("gen{0}_vol", i), _engine.Generators[i].Volume.ToString());
             }
             cfg.Set("master_vol", _engine.MasterVolume.ToString());
+            cfg.Set("color_blind_mode", _colorBlindMode.ToString());
             
             cfg.Save();
         }
@@ -279,44 +325,119 @@ namespace NoiseGen
             if (_state == AppState.ProfileMenu)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("=== LOAD PROFILE ===");
-                Console.WriteLine("UP/DOWN to select, ENTER to load, ESC to cancel");
-                Console.WriteLine("-----------------------------");
-                for(int i=0; i<_profileList.Count; i++)
+                // Box Width 62 chars: 0..61
+                // ┌ + 60 dashes + ┐
+                string top    = "┌────────────────────────────────────────────────────────────┐";
+                string mid    = "│                    === LOAD PROFILE ===                    │";
+                string bot    = "└────────────────────────────────────────────────────────────┘";
+                string header = "│ UP/DOWN: Select | ENTER: Load | DEL: Delete | ESC: Cancel  │";
+                
+                Console.WriteLine(top.PadRight(79));
+                Console.WriteLine(mid.PadRight(79));
+                Console.WriteLine(header.PadRight(79));
+                Console.WriteLine("├────────────────────────────────────────────────────────────┤".PadRight(79));
+                
+                int maxItems = 10;
+                for(int i=0; i < maxItems; i++)
                 {
-                    if (i == _profileIndex) Console.BackgroundColor = ConsoleColor.White; Console.ForegroundColor = ConsoleColor.Black;
-                    
-                    Console.WriteLine(string.Format(" {0} ", _profileList[i]));
-                    
-                    Console.ResetColor();
+                    if (i < _profileList.Count)
+                    {
+                        string prefix = (i == _profileIndex) ? " > " : "   ";
+                        ConsoleColor itemColor = (i == _profileIndex) ? ConsoleColor.Cyan : ConsoleColor.Gray;
+                        
+                        string name = _profileList[i];
+                        if (name.Length > 35) name = name.Substring(0, 35) + "..."; // Truncate if too long
+                        
+                        string content = string.Format("{0}{1}", prefix, name); // length varies
+                        
+                        // Construct line: "│ " + content + padding + " │"
+                        // Total inner width 60 chars.
+                        // "│ " is 2 chars.
+                        // End " │" is 2 chars.
+                        // Content area = 58 chars.
+                        
+                        Console.Write("│ ");
+                        Console.ForegroundColor = itemColor;
+                        Console.Write(content.PadRight(58));
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine(" │".PadRight(19)); // Pad to 79 total line length
+                    }
+                    else
+                    {
+                        Console.WriteLine(("│ ".PadRight(60) + " │").PadRight(79));
+                    }
                 }
+                Console.WriteLine(bot.PadRight(79));
+                
+                // Clear any remaining lines below the menu to mask the background mix TUI
+                for(int i=0; i<10; i++) Console.WriteLine("".PadRight(79));
+                
                 return;
             }
 
             if (_state == AppState.NamingProfile)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("=== SAVE PROFILE ===");
-                Console.WriteLine("Type name and press ENTER. ESC to cancel.");
-                Console.WriteLine("-----------------------------");
-                Console.Write("Name: " + _inputName + "_");
+                string top = "┌────────────────────────────────────────────────────────────┐";
+                string bot = "└────────────────────────────────────────────────────────────┘";
+                
+                Console.WriteLine(top.PadRight(79));
+                Console.WriteLine("│                    === SAVE PROFILE ===                    │".PadRight(79));
+                Console.WriteLine("│ Type name and press ENTER. ESC to cancel.                  │".PadRight(79));
+                Console.WriteLine("├────────────────────────────────────────────────────────────┤".PadRight(79));
+                
+                Console.Write("│ Name: ");
+                string input = _inputName + "_";
+                if (input.Length > 45) input = input.Substring(0, 45); // Safety
+                
+                Console.Write(input.PadRight(52));
+                Console.WriteLine(" │".PadRight(19));
+                Console.WriteLine(bot.PadRight(79));
+                
+                for(int i=0; i<15; i++) Console.WriteLine("".PadRight(79));
+                return;
+            }
+
+            if (_state == AppState.DeleteConfirm)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                string top = "┌────────────────────────────────────────────────────────────┐";
+                string bot = "└────────────────────────────────────────────────────────────┘";
+
+                Console.WriteLine(top.PadRight(79));
+                Console.WriteLine("│                  === DELETE PROFILE? ===                   │".PadRight(79));
+                Console.WriteLine("│                                                            │".PadRight(79));
+                
+                string msg = " Delete '" + _profileList[_profileIndex] + "'?";
+                if (msg.Length > 58) msg = msg.Substring(0, 58);
+                
+                Console.WriteLine(("│ " + msg.PadRight(58) + " │").PadRight(79));
+                Console.WriteLine("│                                                            │".PadRight(79));
+                Console.WriteLine("│        [Y] CONFIRM DELETE         [N] CANCEL               │".PadRight(79));
+                Console.WriteLine(bot.PadRight(79));
+                
+                for(int i=0; i<15; i++) Console.WriteLine("".PadRight(79));
                 return;
             }
 
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("=== LIGHTWEIGHT NOISE GEN ===");
+            Console.WriteLine("=== LIGHTWEIGHT NOISE GEN ===".PadRight(79)); // FIXED: Padding added to wipe artifacts
             Console.ResetColor();
             
             float cpu = 0;
             if (_cpuCounter != null) try { cpu = _cpuCounter.NextValue() / Environment.ProcessorCount; } catch {}
             long mem = _process != null ? _process.PrivateMemorySize64 / 1024 / 1024 : 0;
 
-            Console.ForegroundColor = ConsoleColor.Green;
+            // Stats: White for high contrast readability
+            Console.ForegroundColor = ConsoleColor.White;
             Console.WriteLine(string.Format("RAM: {0} MB | CPU: {1:F1}%   ", mem, cpu).PadRight(79));
             Console.ResetColor();
-            Console.ForegroundColor = ConsoleColor.Magenta;
+            
+            // Profile: Yellow (High Vis)
+            Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine(string.Format("Profile: {0}", _currentProfileName).PadRight(79));
             Console.ResetColor();
+            
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine("-----------------------------".PadRight(79));
             Console.ResetColor();
@@ -334,10 +455,26 @@ namespace NoiseGen
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine("-----------------------------".PadRight(79));
             Console.ResetColor();
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("[UP/DOWN] Select | [SPACE] Toggle | [LEFT/RIGHT] Volume              ");
-            Console.WriteLine("[P] Profiles | [S] Save | [ESC] Quit                                 ");
+            
+            // Controls: Cyan
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("[UP/DOWN] Select | [SPACE] Toggle | [LEFT/RIGHT] Volume".PadRight(79));
+            
+            Console.Write("[P] Profiles | [S] Save | ");
+            
+            // Highlight Color Blind Toggle
+            if (_colorBlindMode) Console.ForegroundColor = ConsoleColor.Yellow; 
+            else Console.ForegroundColor = ConsoleColor.Magenta; // Magenta stands out in regular mode
+            
+            Console.Write("[C] Color Blind Mode");
+            
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine(" | [ESC] Quit".PadRight(40)); // Pad enough to complete the line
+            
             Console.ResetColor();
+            
+            // Cleanup: Ensure we wipe any leftover lines from menus that might be taller than the mix UI
+            for(int k=0; k<10; k++) Console.WriteLine("".PadRight(79));
         }
 
         static void DrawItem(int index, string name, bool enabled, float vol)
@@ -345,47 +482,82 @@ namespace NoiseGen
             if (index == _selectedIndex) Console.BackgroundColor = ConsoleColor.DarkGray;
             else Console.BackgroundColor = ConsoleColor.Black;
 
-            // Color code the status
-            if (enabled)
+            if (_colorBlindMode)
             {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write("[ON] ");
+                // === COLOR BLIND PALETTE (White -> Cyan -> Yellow) ===
+                if (enabled) { Console.ForegroundColor = ConsoleColor.Cyan; Console.Write("[ON] "); }
+                else { Console.ForegroundColor = ConsoleColor.Gray; Console.Write("[OFF]"); }
+                
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write(string.Format(" {0,-20} ", name));
+                
+                // Determine text color based on level
+                ConsoleColor volColor = ConsoleColor.White;
+                if (vol >= 0.35f) volColor = ConsoleColor.Cyan;
+                if (vol >= 0.75f) volColor = ConsoleColor.Yellow;
+
+                int bars = (int)(vol * 20);
+                Console.Write("[");
+                for (int b = 0; b < 20; b++)
+                {
+                    if (b < bars)
+                    {
+                        // Gradient logic for bars
+                        if (b < 7) Console.ForegroundColor = ConsoleColor.White;      // < 35%
+                        else if (b < 15) Console.ForegroundColor = ConsoleColor.Cyan; // < 75%
+                        else Console.ForegroundColor = ConsoleColor.Yellow;           // > 75%
+                        Console.Write("|");
+                    }
+                    else { Console.ForegroundColor = ConsoleColor.Gray; Console.Write("."); }
+                }
+                
+                // Text Color for number
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write("]");
+                
+                Console.ForegroundColor = volColor;
+                string volStr = string.Format(" {0:F2}", vol);
+                
+                // Pad the rest of the line to erase any background artifacts (total width 79)
+                // Current length approx: 5 (ON) + 22 (Name) + 1 ([) + 20 (Bar) + 1 (]) + length of volStr
+                // We just print volStr and then padding
+                Console.WriteLine(volStr.PadRight(79 - (5 + 22 + 1 + 20 + 1))); 
             }
             else
             {
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write("[OFF]");
-            }
-            
-            Console.ForegroundColor = ConsoleColor.White;
-            Console.Write(string.Format(" {0,-20} ", name));
-            
-            // Draw Volume Bar with color gradient
-            int bars = (int)(vol * 20);
-            Console.Write("[");
-            
-            for (int b = 0; b < 20; b++)
-            {
-                if (b < bars)
+                // === REGULAR PALETTE (Green/Red/Gradient) ===
+                if (enabled) { Console.ForegroundColor = ConsoleColor.Green; Console.Write("[ON] "); }
+                else { Console.ForegroundColor = ConsoleColor.Red; Console.Write("[OFF]"); } // Red for OFF
+                
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write(string.Format(" {0,-20} ", name));
+                
+                // Determine text color based on level
+                ConsoleColor volColor = ConsoleColor.Green;
+                if (vol >= 0.5f) volColor = ConsoleColor.Yellow;
+                if (vol >= 0.75f) volColor = ConsoleColor.Red;
+                
+                int bars = (int)(vol * 20);
+                Console.Write("[");
+                for (int b = 0; b < 20; b++)
                 {
-                    // Color gradient: Green -> Yellow -> Red
-                    if (vol < 0.5f)
-                        Console.ForegroundColor = ConsoleColor.Green;
-                    else if (vol < 0.75f)
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                    else
-                        Console.ForegroundColor = ConsoleColor.Red;
-                    Console.Write("|");
+                    if (b < bars)
+                    {
+                        if (b < 10) Console.ForegroundColor = ConsoleColor.Green;      // < 50%
+                        else if (b < 15) Console.ForegroundColor = ConsoleColor.Yellow;// < 75%
+                        else Console.ForegroundColor = ConsoleColor.Red;               // > 75%
+                        Console.Write("|");
+                    }
+                    else { Console.ForegroundColor = ConsoleColor.Gray; Console.Write("."); }
                 }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.Write(".");
-                }
+                
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write("]");
+                
+                Console.ForegroundColor = volColor;
+                string volStr = string.Format(" {0:F2}", vol);
+                Console.WriteLine(volStr.PadRight(79 - (5 + 22 + 1 + 20 + 1)));
             }
-            
-            Console.ForegroundColor = ConsoleColor.Gray;
-            Console.WriteLine(string.Format("] {0:F2}   ", vol));
             
             Console.BackgroundColor = ConsoleColor.Black;
             Console.ResetColor();
