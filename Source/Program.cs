@@ -75,15 +75,31 @@ namespace NoiseGen
         {
             Console.Clear(); // Initial clear
             
+            // Organization: Ensure Profiles folder exists
+            if (!Directory.Exists("Profiles")) Directory.CreateDirectory("Profiles");
+            
+            // Migrate any legacy root INI files to Profiles folder
+            try {
+                foreach(var f in Directory.GetFiles(".", "*.ini"))
+                {
+                    string dest = Path.Combine("Profiles", Path.GetFileName(f));
+                    if (!File.Exists(dest)) File.Move(f, dest);
+                    else File.Delete(f); // Remove root copy if dest exists
+                }
+            } catch {}
+            
+            string lastSessionPath = Path.Combine("Profiles", "last_session.ini");
+
             // Check for last session
-            if (File.Exists("last_session.ini"))
+            if (File.Exists(lastSessionPath))
             {
-                _config = new ConfigManager("last_session.ini");
+                _config = new ConfigManager(lastSessionPath);
                 _currentProfileName = "Last Session";
             }
             else
             {
-                _config = new ConfigManager(); // Default profiles.ini
+                // Fallback to defaults if no last session
+                _config = new ConfigManager(); 
             }
             
             // Ensure we save on exit (even X button)
@@ -122,11 +138,14 @@ namespace NoiseGen
         static void RefreshProfileList()
         {
              _profileList.Clear();
-             var files = Directory.GetFiles(".", "*.ini");
-             foreach(var f in files) 
+             if (Directory.Exists("Profiles"))
              {
-                 string name = Path.GetFileNameWithoutExtension(f);
-                 if (name != "last_session") _profileList.Add(name);
+                 var files = Directory.GetFiles("Profiles", "*.ini");
+                 foreach(var f in files) 
+                 {
+                     string name = Path.GetFileNameWithoutExtension(f);
+                     if (name != "last_session") _profileList.Add(name);
+                 }
              }
              if (_profileList.Count == 0) _profileList.Add("DEFAULT");
         }
@@ -271,7 +290,7 @@ namespace NoiseGen
                 var key = Console.ReadKey(true).Key;
                 if (key == ConsoleKey.Y)
                 {
-                    string target = _profileList[_profileIndex] + ".ini";
+                    string target = Path.Combine("Profiles", _profileList[_profileIndex] + ".ini");
                     if (File.Exists(target))
                     {
                         try { File.Delete(target); } catch {}
@@ -322,7 +341,7 @@ namespace NoiseGen
         static void LoadProfile(string name)
         {
              _currentProfileName = name;
-             _config = new ConfigManager(name + ".ini");
+             _config = new ConfigManager(Path.Combine("Profiles", name + ".ini"));
              _config.Load();
              
              // Apply to engine
@@ -337,7 +356,7 @@ namespace NoiseGen
         static void SaveProfile(string name)
         {
             _currentProfileName = name;
-            var cfg = new ConfigManager(name + ".ini");
+            var cfg = new ConfigManager(Path.Combine("Profiles", name + ".ini"));
             
             for(int i=0; i<_engine.Generators.Count; i++)
             {
