@@ -9,8 +9,8 @@
 *.userosscache
 *.sln.docstates
 
-# Runtime-generated files
-last_session.ini
+# Runtime-generated files and profiles
+*.ini
 crash.log
 
 # Visual Studio
