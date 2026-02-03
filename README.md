@@ -131,7 +131,7 @@ Profile: Default | [P] Profiles | [S] Save | [ESC] Quit
 NoiseGen is built with a modular architecture:
 
 - **`Program.cs`** - Main application loop, UI rendering, and input handling
-- **`AudioEngine.cs`** - Audio playback system using NAudio
+- **`AudioEngine.cs`** - Audio playback system using **Low-Level WinMM API (winmm.dll)**
 - **`Generators.cs`** - Noise generation algorithms (White, Pink, Brown, Binaural)
 - **`ConfigManager.cs`** - INI-based configuration management
 - **`TestSuite.cs`** - Automated testing framework
@@ -196,7 +196,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 🙏 Acknowledgments
 
-- Built with [NAudio](https://github.com/naudio/NAudio) for audio playback
+- Built using **Low-Level WinMM API** for high-performance, lightweight audio playback
 - Inspired by the need for a truly lightweight noise generator
 - Thanks to the open-source community!
 
@@ -205,7 +205,5 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 <div align="center">
 
 **Made with ❤️ for focus, relaxation, and better sleep**
-
-[Report Bug](https://github.com/yourusername/NOISE_GEN/issues) · [Request Feature](https://github.com/yourusername/NOISE_GEN/issues)
 
 </div>
