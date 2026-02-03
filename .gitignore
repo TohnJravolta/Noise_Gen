@@ -1,0 +1,30 @@
+# Build outputs
+*.exe
+*.dll
+*.pdb
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Runtime-generated files
+last_session.ini
+crash.log
+
+# Visual Studio
+.vs/
+bin/
+obj/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
