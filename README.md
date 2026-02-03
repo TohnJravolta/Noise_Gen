@@ -39,7 +39,7 @@ NoiseGen is a **lightweight, terminal-based noise generator** designed for minim
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/NOISE_GEN.git
+   git clone https://github.com/TohnJravolta/NOISE_GEN.git
    cd NOISE_GEN
    ```
 
