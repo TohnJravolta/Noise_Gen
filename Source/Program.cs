@@ -86,6 +86,12 @@ namespace NoiseGen
                 _config = new ConfigManager(); // Default profiles.ini
             }
             
+            // Ensure we save on exit (even X button)
+            _consoleHandler = new HandlerRoutine(ConsoleCtrlCheck);
+            SetConsoleCtrlHandler(_consoleHandler, true);
+            
+            AppDomain.CurrentDomain.ProcessExit += new EventHandler(OnProcessExit);
+            
             _config.Load();
 
             _engine = new AudioEngine();
@@ -127,27 +133,57 @@ namespace NoiseGen
 
         static int _selectedIndex = 0;
         
-        // P/Invoke for GetAsyncKeyState to detect actual key hold
-        [DllImport("user32.dll")]
-        static extern short GetAsyncKeyState(int vKey);
         
         const int VK_LEFT = 0x25;
         const int VK_UP = 0x26;
         const int VK_RIGHT = 0x27;
         const int VK_DOWN = 0x28;
         
+        [DllImport("kernel32.dll")]
+        static extern bool SetConsoleCtrlHandler(HandlerRoutine Handler, bool Add);
+
+        public delegate bool HandlerRoutine(CtrlTypes CtrlType);
+
+        public enum CtrlTypes
+        {
+            CTRL_C_EVENT = 0,
+            CTRL_BREAK_EVENT = 1,
+            CTRL_CLOSE_EVENT = 2,
+            CTRL_LOGOFF_EVENT = 5,
+            CTRL_SHUTDOWN_EVENT = 6
+        }
+        
+        static HandlerRoutine _consoleHandler;
+        
         static void InputMixing()
         {
-            // Process ALL keys in the buffer
-            // We ignore Left/Right here because we handle them via GetAsyncKeyState below
-            // This effectively drains "ghost" repeats of volume keys, while catching discrete presses of others
+            // Process keys
             while (Console.KeyAvailable)
             {
                 var key = Console.ReadKey(true).Key;
                 
                 if (key == ConsoleKey.Escape) _running = false;
                 
-                if (key == ConsoleKey.LeftArrow || key == ConsoleKey.RightArrow) continue; // Ignore buffered volume
+                // Volume Control (Now handled via standard input to respect focus)
+                if (key == ConsoleKey.LeftArrow || key == ConsoleKey.RightArrow)
+                {
+                    float step = 0.01f;
+                    if (key == ConsoleKey.RightArrow)
+                    {
+                        if (_selectedIndex == _engine.Generators.Count) 
+                            _engine.MasterVolume = Math.Min(_engine.MasterVolume + step, 1.0f);
+                        else
+                            _engine.Generators[_selectedIndex].Volume = Math.Min(_engine.Generators[_selectedIndex].Volume + step, 1.0f);
+                    }
+                    else
+                    {
+                        if (_selectedIndex == _engine.Generators.Count) 
+                            _engine.MasterVolume = Math.Max(_engine.MasterVolume - step, 0.0f);
+                        else
+                            _engine.Generators[_selectedIndex].Volume = Math.Max(_engine.Generators[_selectedIndex].Volume - step, 0.0f);
+                    }
+                    continue;
+                }
 
                 if (key == ConsoleKey.P) 
                 {
@@ -177,30 +213,6 @@ namespace NoiseGen
                 {
                     if (_selectedIndex < _engine.Generators.Count)
                         _engine.Generators[_selectedIndex].Enabled = !_engine.Generators[_selectedIndex].Enabled;
-                }
-            }
-            
-            // Volume control using GetAsyncKeyState for real-time hold detection
-            bool leftHeld = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
-            bool rightHeld = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
-            
-            if (leftHeld || rightHeld)
-            {
-                float step = 0.01f;
-                
-                if (rightHeld)
-                {
-                    if (_selectedIndex == _engine.Generators.Count) 
-                        _engine.MasterVolume = Math.Min(_engine.MasterVolume + step, 1.0f);
-                    else
-                        _engine.Generators[_selectedIndex].Volume = Math.Min(_engine.Generators[_selectedIndex].Volume + step, 1.0f);
-                }
-                else if (leftHeld)
-                {
-                    if (_selectedIndex == _engine.Generators.Count) 
-                        _engine.MasterVolume = Math.Max(_engine.MasterVolume - step, 0.0f);
-                    else
-                        _engine.Generators[_selectedIndex].Volume = Math.Max(_engine.Generators[_selectedIndex].Volume - step, 0.0f);
                 }
             }
         }
@@ -569,6 +581,24 @@ namespace NoiseGen
             if (_engine != null) _engine.Dispose();
             Console.CursorVisible = true;
             Console.Clear();
+        }
+
+        static void OnProcessExit(object sender, EventArgs e)
+        {
+            SaveProfile("last_session");
+        }
+
+        private static bool ConsoleCtrlCheck(CtrlTypes ctrlType)
+        {
+            switch (ctrlType)
+            {
+                case CtrlTypes.CTRL_CLOSE_EVENT:
+                case CtrlTypes.CTRL_LOGOFF_EVENT:
+                case CtrlTypes.CTRL_SHUTDOWN_EVENT:
+                    SaveProfile("last_session");
+                    break;
+            }
+            return true;
         }
     }
 }
