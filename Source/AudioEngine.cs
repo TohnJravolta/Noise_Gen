@@ -72,6 +72,7 @@ namespace NoiseGen
 
         public List<IGenerator> Generators = new List<IGenerator>();
         public float MasterVolume { get; set; }
+        public bool MasterEnabled { get; set; }
         
         private Queue<int> _freeBuffers = new Queue<int>();
         private object _lock = new object();
@@ -79,6 +80,7 @@ namespace NoiseGen
         public AudioEngine(int sampleRate = 44100, int bufferLatencyMs = 50)
         {
             MasterVolume = 1.0f;
+            MasterEnabled = true;
             _sampleRate = sampleRate;
             int channels = 2;
             
@@ -165,13 +167,11 @@ namespace NoiseGen
         {
             Array.Clear(_mixBuffer, 0, _mixBuffer.Length);
 
-            bool anyActive = false;
             foreach (var gen in Generators)
             {
                 if (gen.Enabled && gen.Volume > 0)
                 {
                     gen.FillBuffer(_mixBuffer, 0, _mixBuffer.Length, _sampleRate);
-                    anyActive = true;
                 }
             }
 
@@ -181,7 +181,9 @@ namespace NoiseGen
             short[] pcm = _buffers[idx];
             for (int i = 0; i < _mixBuffer.Length; i++)
             {
-                float val = _mixBuffer[i] * MasterVolume;
+                float val = 0;
+                if (MasterEnabled) val = _mixBuffer[i] * MasterVolume;
+                
                 if (val > 1.0f) val = 1.0f;
                 if (val < -1.0f) val = -1.0f;
                 pcm[i] = (short)(val * 32767);
