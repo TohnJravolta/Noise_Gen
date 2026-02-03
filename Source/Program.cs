@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace NoiseGen
 {
@@ -121,8 +122,21 @@ namespace NoiseGen
 
         static int _selectedIndex = 0;
         
+        // P/Invoke for GetAsyncKeyState to detect actual key hold
+        [DllImport("user32.dll")]
+        static extern short GetAsyncKeyState(int vKey);
+        
+        const int VK_LEFT = 0x25;
+        const int VK_UP = 0x26;
+        const int VK_RIGHT = 0x27;
+        const int VK_DOWN = 0x28;
+        
         static void InputMixing()
         {
+            // Clear the keyboard buffer first to prevent ghost inputs
+            while (Console.KeyAvailable) Console.ReadKey(true);
+            
+            // Check for actual key presses using Console for non-volume controls
             if (Console.KeyAvailable)
             {
                 var key = Console.ReadKey(true).Key;
@@ -142,7 +156,7 @@ namespace NoiseGen
                     return;
                 }
 
-                if (key == ConsoleKey.DownArrow) _selectedIndex = Math.Min(_selectedIndex + 1, _engine.Generators.Count); // Count is Master
+                if (key == ConsoleKey.DownArrow) _selectedIndex = Math.Min(_selectedIndex + 1, _engine.Generators.Count);
                 if (key == ConsoleKey.UpArrow) _selectedIndex = Math.Max(_selectedIndex - 1, 0);
                 
                 // Toggle
@@ -151,19 +165,25 @@ namespace NoiseGen
                     if (_selectedIndex < _engine.Generators.Count)
                         _engine.Generators[_selectedIndex].Enabled = !_engine.Generators[_selectedIndex].Enabled;
                 }
-
-                // Volume
-                if (key == ConsoleKey.RightArrow)
+            }
+            
+            // Volume control using GetAsyncKeyState for real-time hold detection
+            bool leftHeld = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
+            bool rightHeld = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
+            
+            if (leftHeld || rightHeld)
+            {
+                float step = 0.01f;
+                
+                if (rightHeld)
                 {
-                    float step = 0.01f;
                     if (_selectedIndex == _engine.Generators.Count) 
                         _engine.MasterVolume = Math.Min(_engine.MasterVolume + step, 1.0f);
                     else
                         _engine.Generators[_selectedIndex].Volume = Math.Min(_engine.Generators[_selectedIndex].Volume + step, 1.0f);
                 }
-                if (key == ConsoleKey.LeftArrow)
+                else if (leftHeld)
                 {
-                    float step = 0.01f;
                     if (_selectedIndex == _engine.Generators.Count) 
                         _engine.MasterVolume = Math.Max(_engine.MasterVolume - step, 0.0f);
                     else
@@ -285,27 +305,39 @@ namespace NoiseGen
 
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("=== LIGHTWEIGHT NOISE GEN ===");
-            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.ResetColor();
             
             float cpu = 0;
             if (_cpuCounter != null) try { cpu = _cpuCounter.NextValue() / Environment.ProcessorCount; } catch {}
             long mem = _process != null ? _process.PrivateMemorySize64 / 1024 / 1024 : 0;
 
+            Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine(string.Format("RAM: {0} MB | CPU: {1:F1}%   ", mem, cpu).PadRight(79));
-            Console.WriteLine(string.Format("Profile: {0} | [P] Profiles | [S] Save | [ESC] Quit   ", _currentProfileName).PadRight(79));
+            Console.ResetColor();
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.WriteLine(string.Format("Profile: {0}", _currentProfileName).PadRight(79));
+            Console.ResetColor();
+            Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine("-----------------------------".PadRight(79));
+            Console.ResetColor();
 
             for (int i = 0; i < _engine.Generators.Count; i++)
             {
                 DrawItem(i, _engine.Generators[i].Name, _engine.Generators[i].Enabled, _engine.Generators[i].Volume);
             }
             
+            Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine("-----------------------------".PadRight(79));
+            Console.ResetColor();
             DrawItem(_engine.Generators.Count, "MASTER VOLUME", true, _engine.MasterVolume);
             
+            Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine("-----------------------------".PadRight(79));
-            Console.WriteLine("[UP/DOWN] Select Channel  | [SPACE] Toggle ON/OFF                    ");
-            Console.WriteLine("[LEFT/RIGHT] Adjust Vol   | [P] Profiles | [S] Save | [ESC] Quit     ");
+            Console.ResetColor();
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("[UP/DOWN] Select | [SPACE] Toggle | [LEFT/RIGHT] Volume              ");
+            Console.WriteLine("[P] Profiles | [S] Save | [ESC] Quit                                 ");
+            Console.ResetColor();
         }
 
         static void DrawItem(int index, string name, bool enabled, float vol)
@@ -313,16 +345,50 @@ namespace NoiseGen
             if (index == _selectedIndex) Console.BackgroundColor = ConsoleColor.DarkGray;
             else Console.BackgroundColor = ConsoleColor.Black;
 
-            string status = enabled ? "[ON] " : "[OFF]";
-            Console.Write(string.Format("[{0}] {1,-20} ", status, name));
+            // Color code the status
+            if (enabled)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write("[ON] ");
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write("[OFF]");
+            }
             
-            // Draw Volume Bar
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write(string.Format(" {0,-20} ", name));
+            
+            // Draw Volume Bar with color gradient
             int bars = (int)(vol * 20);
             Console.Write("[");
-            for (int b = 0; b < 20; b++) Console.Write(b < bars ? "|" : ".");
+            
+            for (int b = 0; b < 20; b++)
+            {
+                if (b < bars)
+                {
+                    // Color gradient: Green -> Yellow -> Red
+                    if (vol < 0.5f)
+                        Console.ForegroundColor = ConsoleColor.Green;
+                    else if (vol < 0.75f)
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                    else
+                        Console.ForegroundColor = ConsoleColor.Red;
+                    Console.Write("|");
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write(".");
+                }
+            }
+            
+            Console.ForegroundColor = ConsoleColor.Gray;
             Console.WriteLine(string.Format("] {0:F2}   ", vol));
             
             Console.BackgroundColor = ConsoleColor.Black;
+            Console.ResetColor();
         }
 
         static void Shutdown()
