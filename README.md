@@ -10,6 +10,9 @@
 
 </div>
 
+
+![NoiseGen Interface](preview.webp)
+
 ---
 
 ## 📖 Overview
@@ -79,11 +82,13 @@ While many noise generators exist, NoiseGen is built differently:
 
 | Key | Action |
 |-----|--------|
-| <kbd>↑</kbd> / <kbd>↓</kbd> | Navigate between channels |
+| <kbd>↑</kbd> / <kbd>↓</kbd> / <kbd>Tab</kbd> | Navigate channels (<kbd>Shift</kbd>+<kbd>Tab</kbd> for up) |
 | <kbd>←</kbd> / <kbd>→</kbd> | Adjust volume (±1% per step, hold for rapid adjustment) |
 | <kbd>Space</kbd> / <kbd>Enter</kbd> | Toggle channel ON/OFF |
 | <kbd>P</kbd> | Open Profile Menu (Load/Delete) |
 | <kbd>S</kbd> | Save current configuration as a profile |
+| <kbd>R</kbd> | Reset all settings to defaults |
+| <kbd>M</kbd> | Mute/Unmute Master Volume |
 | <kbd>C</kbd> | Toggle **Color Blind Mode** |
 | <kbd>Esc</kbd> | Quit application / Cancel menu |
 
