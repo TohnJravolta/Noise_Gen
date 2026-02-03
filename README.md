@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**A minimal, efficient white noise generator with customizable sound profiles**
+**A minimal, efficient white noise generator with customizable sound profiles and accessibility focus**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)]()
@@ -14,17 +14,20 @@
 
 ## 📖 Overview
 
-NoiseGen is a **lightweight, terminal-based noise generator** designed for minimal system footprint and maximum customization. Perfect for focus, relaxation, or sleep, it generates true random noise in real-time rather than looping pre-recorded sounds.
+NoiseGen is a **lightweight, terminal-based noise generator** designed for minimal system footprint and maximum customization. Perfect for focus, relaxation, or sleep, it generates true random noise in real-time rather than looping pre-recorded sounds. 
+
+Now featuring a dedicated **Color Blind Mode** for enhanced accessibility.
 
 ### ✨ Key Features
 
+- 🖥️ **Terminal UI**: Clean, visual interface with performance monitoring
 - 🎚️ **Multiple Noise Types**: White, Pink, and Brown noise generators
 - 🧠 **Binaural Beats**: Focus (14Hz Beta), Relax (7Hz Alpha), Sleep (4Hz Theta)
-- 💾 **Profile Management**: Save and load custom sound configurations
-- ⚡ **Ultra-Lightweight**: Minimal RAM and CPU usage
-- 🎛️ **Real-time Control**: Adjust volumes and toggle channels on-the-fly
-- 🖥️ **Terminal UI**: Clean, visual interface with performance monitoring
-- 🔄 **True Random Generation**: No loops, seamless audio playback
+- 💾 **Profile Management**: Save, load, and delete custom sound configurations
+- 🎨 **Color Blind Mode**: High-contrast, color-blind friendly visual palette
+- ⚡ **Ultra-Lightweight**: Minimal RAM core (~15MB) and CPU usage (<1%)
+- 🎛️ **Precision Control**: Real-time incremental volume adjustments
+- 🔄 **True Random Generation**: No loops, seamless audio playback via low-level WinMM API
 
 ---
 
@@ -32,7 +35,7 @@ NoiseGen is a **lightweight, terminal-based noise generator** designed for minim
 
 ### Prerequisites
 
-- **Windows** with .NET Framework 4.0 or higher
+- **Windows** (7/8/10/11) with .NET Framework 4.0 or higher
 - **C# Compiler** (included with .NET Framework)
 
 ### Installation
@@ -59,57 +62,53 @@ NoiseGen is a **lightweight, terminal-based noise generator** designed for minim
 
 ## 🎮 Usage
 
-### Main Interface
-
-When you launch NoiseGen, you'll see a clean terminal interface showing:
-
-```
-=== LIGHTWEIGHT NOISE GEN ===
-RAM: 15 MB | CPU: 2.3%
-Profile: Default | [P] Profiles | [S] Save | [ESC] Quit
------------------------------
-[OFF] White Noise         [||||||||||..........] 0.50
-[OFF] Pink Noise          [||||||||||..........] 0.50
-[OFF] Brown Noise         [||||||||||..........] 0.50
-[OFF] Focus (14Hz Beta)   [||||||||||..........] 0.50
-[OFF] Relax (7Hz Alpha)   [||||||||||..........] 0.50
-[OFF] Sleep (4Hz Theta)   [||||||||||..........] 0.50
------------------------------
-[[ON]  MASTER VOLUME       [||||||||||||||||||||] 1.00
-```
-
 ### Controls
 
 | Key | Action |
 |-----|--------|
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Navigate between channels |
+| <kbd>←</kbd> / <kbd>→</kbd> | Adjust volume (±1% per step, hold for rapid adjustment) |
 | <kbd>Space</kbd> / <kbd>Enter</kbd> | Toggle channel ON/OFF |
-| <kbd>←</kbd> / <kbd>→</kbd> | Adjust volume (±1%) |
-| <kbd>P</kbd> | Open profile menu |
-| <kbd>S</kbd> | Save current configuration |
-| <kbd>Esc</kbd> | Quit application |
+| <kbd>P</kbd> | Open Profile Menu (Load/Delete) |
+| <kbd>S</kbd> | Save current configuration as a profile |
+| <kbd>C</kbd> | Toggle **Color Blind Mode** |
+| <kbd>Esc</kbd> | Quit application / Cancel menu |
 
-### Profile Management
+### 🎨 Visual Modes
+
+#### Regular Mode (Default)
+- **ON Status**: Green 🟢
+- **OFF Status**: Red 🔴 (High Visibility)
+- **Gradient**: Green (Low) → Yellow (Med) → Red (Loud)
+
+#### Color Blind Mode
+- **Palette**: High-contrast scheme avoiding Red/Green combinations.
+- **Gradient**: White (Low) → Cyan (Med) → Yellow (High Visibility)
+- **Toggle**: Press <kbd>C</kbd> to switch modes. The setting is automatically saved!
+
+### 💾 Profile Management
 
 #### Saving a Profile
-
-1. Press <kbd>S</kbd> to enter save mode
-2. Type a name (letters, numbers, `_`, `-` allowed)
-3. Press <kbd>Enter</kbd> to save
-4. Your profile is saved as `[name].ini`
+1. Press <kbd>S</kbd> to enter save mode.
+2. Type a name (letters, numbers, `_`, `-` allowed).
+3. Press <kbd>Enter</kbd> to save.
 
 #### Loading a Profile
+1. Press <kbd>P</kbd> to open the bridged profile menu.
+2. Use <kbd>↑</kbd> / <kbd>↓</kbd> to select.
+3. Press <kbd>Enter</kbd> to load.
 
-1. Press <kbd>P</kbd> to open the profile menu
-2. Use <kbd>↑</kbd> / <kbd>↓</kbd> to select a profile
-3. Press <kbd>Enter</kbd> to load
-4. Press <kbd>Esc</kbd> to cancel
+#### Deleting a Profile
+1. Open the profile menu (<kbd>P</kbd>).
+2. Highlight the profile you wish to remove.
+3. Press <kbd>Delete</kbd>.
+4. Confirm with <kbd>Y</kbd> (Yes) or cancel with <kbd>N</kbd> (No).
 
 > **Note:** Your last session is automatically saved and restored on next launch!
 
 ---
 
-## 🎨 Noise Types Explained
+## 🎨 Noise Types explained
 
 | Type | Description | Best For |
 |------|-------------|----------|
@@ -128,31 +127,17 @@ Profile: Default | [P] Profiles | [S] Save | [ESC] Quit
 
 ### Architecture
 
-NoiseGen is built with a modular architecture:
+NoiseGen is built with a focus on stability and performance:
 
-- **`Program.cs`** - Main application loop, UI rendering, and input handling
-- **`AudioEngine.cs`** - Audio playback system using **Low-Level WinMM API (winmm.dll)**
-- **`Generators.cs`** - Noise generation algorithms (White, Pink, Brown, Binaural)
-- **`ConfigManager.cs`** - INI-based configuration management
-- **`TestSuite.cs`** - Automated testing framework
+- **`Program.cs`** - State machine, input buffering (with async key-hold), and artifact-free UI drawing.
+- **`AudioEngine.cs`** - Memory-safe audio playback using low-level WinMM buffers and manual pinning.
+- **`Generators.cs`** - Math-based noise algorithms for seamless playback.
+- **`ConfigManager.cs`** - C# 5 compatible INI management.
 
-### Building from Source
+### Building & Testing
 
-The project uses a simple batch script for compilation:
-
-```batch
-build.bat
-```
-
-This compiles all `.cs` files in the `Source/` directory using the .NET Framework C# compiler.
-
-### Running Tests
-
-```bash
-NoiseGen.exe --test
-```
-
-Runs the automated test suite to verify noise generation algorithms.
+- **Build**: Run `build.bat` to compile `NoiseGen.exe`.
+- **Test**: Run `test.bat` or `NoiseGen.exe --test` to verify generators and persistence.
 
 ---
 
@@ -161,28 +146,15 @@ Runs the automated test suite to verify noise generation algorithms.
 ```
 NOISE_GEN/
 ├── Source/
-│   ├── Program.cs          # Main application
-│   ├── AudioEngine.cs      # Audio playback
-│   ├── Generators.cs       # Noise algorithms
-│   ├── ConfigManager.cs    # Configuration
-│   └── TestSuite.cs        # Tests
-├── build.bat               # Build script
-├── test.bat                # Test runner
-├── *.ini                   # Profile files
-├── README.md               # This file
-└── LICENSE                 # MIT License
+│   ├── Program.cs          # Main application & TUI
+│   ├── AudioEngine.cs      # Audio processing & Drivers
+│   ├── Generators.cs       # Noise & Binaural algorithms
+│   ├── ConfigManager.cs    # Configuration persistence
+│   └── TestSuite.cs        # Automated self-tests
+├── build.bat               # Simple build script
+├── test.bat                # Test execution script
+└── README.md               # Documentation
 ```
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Feel free to:
-
-- 🐛 Report bugs
-- 💡 Suggest new features
-- 🔧 Submit pull requests
-- 📖 Improve documentation
 
 ---
 
@@ -204,6 +176,6 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 <div align="center">
 
-**Made with ❤️ for focus, relaxation, and better sleep**
+**Made with ❤️ for focus, relaxation, and accessibility**
 
 </div>
