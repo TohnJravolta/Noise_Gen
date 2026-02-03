@@ -68,12 +68,12 @@ When you launch NoiseGen, you'll see a clean terminal interface showing:
 RAM: 15 MB | CPU: 2.3%
 Profile: Default | [P] Profiles | [S] Save | [ESC] Quit
 -----------------------------
-[[OFF] White Noise         [....................] 0.50
-[[ON]  Pink Noise          [||||||||||..........] 0.50
-[[OFF] Brown Noise         [....................] 0.50
-[[OFF] Focus (14Hz Beta)   [....................] 0.50
-[[OFF] Relax (7Hz Alpha)   [....................] 0.50
-[[OFF] Sleep (4Hz Theta)   [....................] 0.50
+[OFF] White Noise         [||||||||||..........] 0.50
+[OFF] Pink Noise          [||||||||||..........] 0.50
+[OFF] Brown Noise         [||||||||||..........] 0.50
+[OFF] Focus (14Hz Beta)   [||||||||||..........] 0.50
+[OFF] Relax (7Hz Alpha)   [||||||||||..........] 0.50
+[OFF] Sleep (4Hz Theta)   [||||||||||..........] 0.50
 -----------------------------
 [[ON]  MASTER VOLUME       [||||||||||||||||||||] 1.00
 ```
