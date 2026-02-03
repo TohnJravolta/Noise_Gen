@@ -18,6 +18,19 @@ NoiseGen is a **lightweight, terminal-based noise generator** designed for minim
 
 Now featuring a dedicated **Color Blind Mode** for enhanced accessibility.
 
+---
+
+## 🌟 What Makes NoiseGen Unique?
+
+While many noise generators exist, NoiseGen is built differently:
+
+- 🎚️ **Live TUI Mixing Board**: Most CLI tools are "one-shot" commands. NoiseGen gives you a live, interactive dashboard to adjust volumes and toggle channels on the fly without restarting.
+- 🔢 **Pure Algorithmic Synthesis**: We don't use audio loops. Every sound is generated in real-time using pure mathematics (White, Pink, Brown noise and Binaural Beats), ensuring zero "loop seams" or repeating patterns.
+- 🪶 **Zero Distraction, Zero Bloat**: No heavy browser tabs or complex GUI frameworks. It runs in a tiny corner of your terminal with a memory footprint smaller than an empty Chrome tab.
+- 🎨 **Accessibility First**: Unlike most terminal apps, NoiseGen includes a dedicated **Color Blind Mode** as a primary feature, ensuring the visual mixer is usable by everyone.
+
+---
+
 ### ✨ Key Features
 
 - 🖥️ **Terminal UI**: Clean, visual interface with performance monitoring
